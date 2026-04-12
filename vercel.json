@@ -2,8 +2,14 @@
   "version": 2,
   "functions": {
     "api/*.js": {
-      "memory": 128,
-      "maxDuration": 10
+      "memory": 256,
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/crawl",
+      "schedule": "0 1 * * *"
+    }
+  ]
 }
