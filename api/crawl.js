@@ -31,37 +31,41 @@ function sleep(ms) {
 }
 
 // =============================
-// カーセンサーのHTMLから車両情報を抽出
+// カーセンサーのHTMLから車両情報を抽出（本体価格を取得）
 // =============================
 function parseCarsensorHtml(html) {
   const cars = [];
-
-  // 車両IDをURLから抽出: /usedcar/detail/CS-XXXXXX/ パターン
   const detailPattern = /href="[^"]*\/usedcar\/detail\/([A-Z0-9\-]+)[^"]*"/g;
-  const pricePattern = /(\d+(?:,\d+)?(?:\.\d+)?)\s*万円/g;
 
-  // 車両IDを収集
   const ids = new Set();
   let idMatch;
   while ((idMatch = detailPattern.exec(html)) !== null) {
-    ids.add(idMatch[1]);
+    ids.add({ id: idMatch[1], pos: idMatch.index });
   }
 
-  // 価格を収集（順番にIDと対応させる）
-  const prices = [];
-  let priceMatch;
-  while ((priceMatch = pricePattern.exec(html)) !== null) {
-    const price = parseFloat(priceMatch[1].replace(",", ""));
-    if (price >= 1 && price <= 10000) {
-      prices.push(price);
+  idArray.forEach(({ id, pos }) => {
+    const nearby = html.slice(pos, pos + 3000);
+
+    let price = null;
+
+    // パターン1: 「車両本体価格」の後の価格
+    const bodyMatch = nearby.match(/(?:車両本体価格|本体価格)[^0-9]*([\d,]+\.?\d*)\s*万円/);
+    if (bodyMatch) {
+      price = parseFloat(bodyMatch[1].replace(",", ""));
     }
-  }
 
-  // IDと価格をペアにする
-  const idArray = [...ids];
-  idArray.forEach((id, index) => {
-    if (prices[index]) {
-      cars.push({ car_id: "CS-" + id, price: prices[index] });
+    // パターン2: 2番目の価格（1つ目=支払総額、2つ目=本体価格）
+    if (!price) {
+      const allPrices = [...nearby.matchAll(/([\d,]+\.?\d*)\s*万円/g)];
+      if (allPrices.length >= 2) {
+        price = parseFloat(allPrices[1][1].replace(",", ""));
+      } else if (allPrices.length === 1) {
+        price = parseFloat(allPrices[0][1].replace(",", ""));
+      }
+    }
+
+    if (price && price >= 1 && price <= 10000) {
+      cars.push({ car_id: "CS-" + id, price });
     }
   });
 
